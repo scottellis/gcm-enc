@@ -15,12 +15,22 @@ const AES_PAD_SIZE = 16
 
 
 func usage() {
-    fmt.Println("\n  Usage: gcm-enc -k <key-file> -p <plaintext-file> [-c <ciphertext-file>][-v]")
+    fmt.Println("\ngcm-enc, an aes-gcm encryption utility\n")
+    fmt.Println("   usage: gcm-enc -k <key-file> -p <plaintext-file> [-c <ciphertext-file>][-v]\n")
+    fmt.Println("   -p     Plaintext input file to be encrypted")
+    fmt.Println("   -k     Path to a 256-bit binary key file")
+    fmt.Println("          If the file does not exist a random key will be generated and saved to <key-file>")
+    fmt.Println("   -c     Encrypted output file")
+    fmt.Println("   -v     Debug hexdump output")
+    fmt.Println("   -h     Show this help")
+
+    fmt.Println("\nNote: One of -c or -v must be chosen or there is no point in running.\n")
+
     os.Exit(1)
 }
 
 func dump_hex(prompt string, hex []byte) {
-    fmt.Printf(prompt);
+    fmt.Printf(prompt)
 
     for i := 0; i < len(hex); i++ {
         if ((i % 16) == 0) {
@@ -62,11 +72,12 @@ func readKey(path string) *[32]byte {
         if err != nil {
             panic(err)
         }
+
     } else {
-        panic(err);
+        panic(err)
     }
 
-    return &key;
+    return &key
 }
 
 func readPlaintextPadded(path string) *[]byte {
@@ -84,7 +95,7 @@ func readPlaintextPadded(path string) *[]byte {
         os.Exit(1)
     }
 
-    var padchar byte = (byte)(len / AES_PAD_SIZE)
+    var padchar byte = (byte)(len % AES_PAD_SIZE)
 
     if padchar == 0x00 {
         padchar = 0x10
@@ -108,8 +119,13 @@ func main() {
     plaintext_file := flag.String("p", "", "input plaintext file")
     ciphertext_file := flag.String("c", "", "output ciphertext file")
     verbose := flag.Bool("v", false, "verbose mode")
+    help := flag.Bool("h", false, "help")
 
     flag.Parse()
+
+    if *help {
+        usage()
+    }
 
     if len(*key_file) == 0 {
         fmt.Println("A key file is required")
@@ -118,17 +134,16 @@ func main() {
 
     if len(*plaintext_file) == 0 {
         fmt.Println("A plaintext file is required")
-        usage();
+        usage()
+    }
+
+    if !*verbose && len(*ciphertext_file) == 0 {
+        usage()
     }
 
     key := readKey(*key_file)
 
     plaintext := readPlaintextPadded(*plaintext_file)
-
-    if *verbose {
-        dump_hex("key: ", key[:])
-        dump_hex("plaintext: ", *plaintext)
-    }
 
     ciphertext, err := cryptopasta.Encrypt(*plaintext, key)
 
@@ -137,6 +152,7 @@ func main() {
     }
 
     if *verbose {
+        dump_hex("plaintext (with padding): ", *plaintext)
         dump_hex("iv: ", ciphertext[:IV_SIZE])
         dump_hex("ciphertext: ", ciphertext[12:len(ciphertext) - GCM_TAG_SIZE])
         dump_hex("tag: ", ciphertext[len(ciphertext) - GCM_TAG_SIZE:])
